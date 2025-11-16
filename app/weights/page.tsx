@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalculationWeights } from '@/types';
+import Tooltip from '@/components/Tooltip';
 
 export default function WeightsPage() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function WeightsPage() {
               <div className="flex justify-between items-center mb-2">
                 <label className="text-lg font-medium text-gray-700">
                   Cost Weight
+                  <Tooltip text="Importance of total landed cost in the final recommendation. Higher weight means cost is more important. Lower total cost results in a higher score. Weights must sum to 100%." />
                 </label>
                 <span className="text-2xl font-bold text-blue-600">
                   {(weights.cost * 100).toFixed(1)}%
@@ -108,6 +110,7 @@ export default function WeightsPage() {
               <div className="flex justify-between items-center mb-2">
                 <label className="text-lg font-medium text-gray-700">
                   Carbon Weight
+                  <Tooltip text="Importance of carbon emissions in the final recommendation. Higher weight means environmental impact is more important. Lower total carbon emissions result in a higher score. Weights must sum to 100%." />
                 </label>
                 <span className="text-2xl font-bold text-green-600">
                   {(weights.carbon * 100).toFixed(1)}%
@@ -131,6 +134,7 @@ export default function WeightsPage() {
               <div className="flex justify-between items-center mb-2">
                 <label className="text-lg font-medium text-gray-700">
                   Risk Weight
+                  <Tooltip text="Importance of supply chain risk in the final recommendation. Higher weight means risk factors (lead time, reliability, logistics complexity) are more important. Lower risk results in a higher score. Weights must sum to 100%." />
                 </label>
                 <span className="text-2xl font-bold text-red-600">
                   {(weights.risk * 100).toFixed(1)}%

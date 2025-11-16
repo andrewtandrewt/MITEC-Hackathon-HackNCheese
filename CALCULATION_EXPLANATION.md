@@ -43,12 +43,6 @@ This document provides a comprehensive explanation of every input field, calcula
     - Lower emissions (0.6 t CO₂/ton average)
     - Depends on grid carbon intensity
     - Requires quality scrap metal
-  - **NG-DRI-EAF (Natural Gas Direct Reduced Iron)**:
-    - Medium emissions (1.0 t CO₂/ton average)
-    - Uses natural gas for reduction instead of coal
-  - **H2-DRI (Hydrogen Direct Reduced Iron)**:
-    - Lowest emissions (0.125 t CO₂/ton average)
-    - Future-focused, requires green hydrogen infrastructure
 - **Impact**: Directly affects production CO₂ calculation and green steel eligibility
 
 ---

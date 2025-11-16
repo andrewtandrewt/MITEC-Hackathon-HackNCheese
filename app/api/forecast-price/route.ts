@@ -7,18 +7,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
-      mwCapacity,
+      steelRoute,
       futureYear,
       country,
       bfAssumptions,
       eafAssumptions,
       carbonTax,
+      mwCapacity, // Optional, defaults to 100 if not provided
     } = body;
 
     // Validate inputs
-    if (!mwCapacity || !futureYear || !country) {
+    if (!steelRoute || !futureYear || !country) {
       return NextResponse.json(
-        { error: 'Missing required fields: mwCapacity, futureYear, country' },
+        { error: 'Missing required fields: steelRoute, futureYear, country' },
         { status: 400 }
       );
     }
@@ -41,7 +42,8 @@ export async function POST(request: NextRequest) {
     
     // Prepare input data as JSON string
     const inputData = JSON.stringify({
-      mw_capacity: mwCapacity,
+      mw_capacity: mwCapacity || 100.0, // Default to 100 MW if not provided
+      steel_route: steelRoute,
       future_year: futureYear,
       country: country,
       bf_assumptions: bfAssumptions || {

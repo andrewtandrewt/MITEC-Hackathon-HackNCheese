@@ -6,11 +6,13 @@ import { Supplier } from '@/types';
 import { MOCK_SUPPLIERS } from '@/data/mockSuppliers';
 import { STEEL_ROUTES, COUNTRY_FACTORS } from '@/data/constants';
 import { getDefaultTradePolicyValues } from '@/data/tradePolicy';
+import Tooltip from '@/components/Tooltip';
 
 export default function Home() {
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
   const [hasForecast, setHasForecast] = useState(false);
+  const [solarFarmCapacity, setSolarFarmCapacity] = useState<number>(100.0);
 
   useEffect(() => {
     // Check if forecasted prices are available
@@ -98,6 +100,7 @@ export default function Home() {
 
   const saveAndContinue = () => {
     localStorage.setItem('suppliers', JSON.stringify(suppliers));
+    localStorage.setItem('solarFarmCapacity', JSON.stringify(solarFarmCapacity));
     router.push('/transportation');
   };
 
@@ -123,6 +126,25 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-2xl font-semibold mb-4">Project Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Solar Farm Capacity (MW)
+                <Tooltip text="The total capacity of the solar farm project in megawatts. Used to calculate total steel tonnage required (approximately 40 tons per MW)." />
+              </label>
+              <input
+                type="number"
+                value={solarFarmCapacity}
+                onChange={(e) => setSolarFarmCapacity(parseFloat(e.target.value) || 0)}
+                className="w-full border border-gray-300 rounded px-3 py-2"
+                min="0"
+              />
+            </div>
+          </div>
+        </div>
 
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -158,7 +180,10 @@ export default function Home() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Name
+                      <Tooltip text="The name or identifier of the steel supplier company" />
+                    </label>
                     <input
                       type="text"
                       value={supplier.name}
@@ -169,7 +194,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Country
+                      <Tooltip text="Country of origin for the steel supplier. Affects tariffs, trade policies, and country risk factors." />
+                    </label>
                     <select
                       value={supplier.country}
                       onChange={(e) => updateSupplier(supplier.id, 'country', e.target.value)}
@@ -182,7 +210,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Steel Route</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Steel Route
+                      <Tooltip text="Production method: BF-BOF (traditional blast furnace, higher emissions) or Scrap-EAF (electric arc furnace using scrap, lower emissions)" />
+                    </label>
                     <select
                       value={supplier.steelRoute}
                       onChange={(e) => updateSupplier(supplier.id, 'steelRoute', e.target.value)}
@@ -195,7 +226,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (USD/ton)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Base Price (USD/ton)
+                      <Tooltip text="The fundamental cost of raw steel per ton before any processing, tariffs, or additional fees. This is the starting point for all cost calculations." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.basePrice}
@@ -205,7 +239,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Conversion Cost (USD/ton)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Conversion Cost (USD/ton)
+                      <Tooltip text="Additional processing costs per ton for operations like slitting, galvanizing, coating, cutting, or other value-added services. Not all steel comes ready-to-use." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.conversionCost}
@@ -217,7 +254,7 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Tariff Rate (%)
-                      <span className="text-xs text-blue-600 ml-1" title="Auto-populated from 2024-2025 trade policy data">📋</span>
+                      <Tooltip text="Standard import tariff percentage applied by the importing country. Auto-populated from 2024-2025 trade policy data. US: 0% (domestic), China/India: 50% (Section 232 tariff)." />
                     </label>
                     <input
                       type="number"
@@ -230,7 +267,7 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Anti-Dumping Duty (%)
-                      <span className="text-xs text-blue-600 ml-1" title="Auto-populated from 2024-2025 trade policy data">📋</span>
+                      <Tooltip text="Additional tariff percentage when supplier is found to be selling below fair market value. Auto-populated from 2024-2025 trade policy data. Protects domestic industries from unfair pricing." />
                     </label>
                     <input
                       type="number"
@@ -243,7 +280,7 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Countervailing Duty (%)
-                      <span className="text-xs text-blue-600 ml-1" title="Auto-populated from 2024-2025 trade policy data">📋</span>
+                      <Tooltip text="Tariff percentage to offset foreign government subsidies. Auto-populated from 2024-2025 trade policy data. Levels the playing field when foreign governments subsidize production." />
                     </label>
                     <input
                       type="number"
@@ -256,7 +293,7 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Domestic Tax Credits (USD/ton)
-                      <span className="text-xs text-blue-600 ml-1" title="Auto-populated from 2024-2025 trade policy data (IRA, Buy America)">📋</span>
+                      <Tooltip text="Government incentives for sourcing domestically, such as IRA (Inflation Reduction Act) and Buy America provisions. Auto-populated from 2024-2025 trade policy data. Only applies to US suppliers." />
                     </label>
                     <input
                       type="number"
@@ -269,7 +306,7 @@ export default function Home() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Green Steel Subsidies (USD/ton)
-                      <span className="text-xs text-blue-600 ml-1" title="Auto-populated from 2024-2025 trade policy data (Section 45Q, IRA)">📋</span>
+                      <Tooltip text="Incentives for low-carbon steel production, such as Section 45Q carbon capture credits and IRA green energy incentives. Auto-populated from 2024-2025 trade policy data. Only applies to Scrap-EAF routes." />
                     </label>
                     <input
                       type="number"
@@ -280,7 +317,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Reliability (1-10)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Supplier Reliability (1-10)
+                      <Tooltip text="Measure of supplier's track record and dependability on a scale of 1-10. Higher scores indicate better historical performance, fewer quality issues, and more reliable contract fulfillment. Used in risk calculations." />
+                    </label>
                     <input
                       type="number"
                       min="1"
@@ -292,7 +332,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lead Time (days)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Lead Time (days)
+                      <Tooltip text="Time from order placement to delivery in days. Longer lead times increase inventory costs, reduce flexibility, and affect production planning. Used in risk score calculations." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.leadTime}
@@ -302,7 +345,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Supply Chain Handoffs</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Supply Chain Handoffs
+                      <Tooltip text="Number of intermediaries or transfer points in the supply chain. More handoffs increase complexity, potential for delays, errors, and points of failure. Used in risk score calculations." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.supplyChainHandoffs}
@@ -312,7 +358,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Order Commitment (tons)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Min Order Commitment (tons)
+                      <Tooltip text="Minimum quantity required to place an order. Higher minimums reduce flexibility and can lock in capital. Currently captured but not directly used in calculations." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.minOrderCommitment}
@@ -322,7 +371,10 @@ export default function Home() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Brokerage Fees (USD/ton)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Brokerage Fees (USD/ton)
+                      <Tooltip text="Fees for customs clearance, documentation, logistics coordination, and other administrative costs. Often overlooked but can be significant. Added directly to total cost." />
+                    </label>
                     <input
                       type="number"
                       value={supplier.brokerageFees}

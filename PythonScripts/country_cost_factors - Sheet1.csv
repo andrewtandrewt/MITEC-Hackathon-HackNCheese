@@ -1,0 +1,6 @@
+country,iron_ore,coal,scrap,electricity,fluxes,labor_bf,labor_eaf,carbon_tax
+US,1.1,1.2,1.3,0.08,1,70,60,85
+China,0.75,0.7,0.5,0.06,0.8,40,30,10
+India,0.85,0.9,0.55,0.09,0.95,25,20,0
+Germany,1.2,1.15,1.4,0.32,1.1,100,80,120
+Brazil,0.7,0.75,0.6,0.07,0.85,30,25,0

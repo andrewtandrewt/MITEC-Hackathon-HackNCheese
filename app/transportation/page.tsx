@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Transportation, TransportationSegment } from '@/types';
 import { TRANSPORT_MODES } from '@/data/constants';
+import Tooltip from '@/components/Tooltip';
 
 export default function TransportationPage() {
   const router = useRouter();
@@ -108,6 +109,7 @@ export default function TransportationPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Distance (km)
+                      <Tooltip text="The distance this transportation segment will travel in kilometers. For multi-modal transport, add multiple segments (e.g., ship for ocean leg, then truck for final delivery)." />
                     </label>
                     <input
                       type="number"
@@ -121,6 +123,7 @@ export default function TransportationPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Transport Mode
+                      <Tooltip text="Method of transportation: Truck (flexible, higher emissions), Rail (efficient for long distances), Ship (most efficient, lowest emissions), or Air (fastest but highest emissions and cost)." />
                     </label>
                     <select
                       value={segment.mode}

@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Tooltip from '@/components/Tooltip';
+import { STEEL_ROUTES } from '@/data/constants';
+import type { SteelProductionRoute } from '@/types';
 
 interface ForecastResult {
   success: boolean;
@@ -24,8 +27,19 @@ export default function ForecastPage() {
   const [result, setResult] = useState<ForecastResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Get solar farm capacity from supplier setup page if available
+  const getSolarFarmCapacity = (): number => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solarFarmCapacity');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    }
+    return 100.0; // Default
+  };
+
   const [formData, setFormData] = useState({
-    mwCapacity: 100.0,
+    steelRoute: 'BF-BOF' as SteelProductionRoute,
     futureYear: 2027,
     country: 'US',
     carbonTax: 50.0,
@@ -47,13 +61,19 @@ export default function ForecastPage() {
   const updateFormData = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof typeof prev],
-          [child]: value,
-        },
-      }));
+      setFormData(prev => {
+        const parentValue = prev[parent as keyof typeof prev];
+        if (typeof parentValue === 'object' && parentValue !== null) {
+          return {
+            ...prev,
+            [parent]: {
+              ...(parentValue as Record<string, any>),
+              [child]: value,
+            },
+          };
+        }
+        return prev;
+      });
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
@@ -65,12 +85,18 @@ export default function ForecastPage() {
     setResult(null);
 
     try {
+      // Get solar farm capacity from supplier setup page
+      const mwCapacity = getSolarFarmCapacity();
+      
       const response = await fetch('/api/forecast-price', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          mwCapacity, // Include solar farm capacity from supplier setup
+        }),
       });
 
       const data = await response.json();
@@ -82,11 +108,17 @@ export default function ForecastPage() {
       setResult(data);
       
       // Store forecasted prices for use in supplier setup
+      // Use the appropriate cost based on selected steel route
+      const forecastedPrice = formData.steelRoute === 'Scrap-EAF' 
+        ? (data.eaf_cost_per_ton || 720)
+        : (data.bf_cost_per_ton || 850);
+      
       const forecastedPrices = {
-        US: data.bf_cost_per_ton || 850,
-        China: data.bf_cost_per_ton ? data.bf_cost_per_ton * 0.85 : 650,
-        India: data.bf_cost_per_ton ? data.bf_cost_per_ton * 0.9 : 720,
+        US: forecastedPrice,
+        China: forecastedPrice * 0.85,
+        India: forecastedPrice * 0.9,
         eaf: data.eaf_cost_per_ton,
+        bf: data.bf_cost_per_ton,
       };
       
       localStorage.setItem('forecastedPrices', JSON.stringify(forecastedPrices));
@@ -117,20 +149,26 @@ export default function ForecastPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Solar Farm Capacity (MW)
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Country
+                  <Tooltip text="Country for cost factor adjustments. Different countries have different material costs, labor rates, and market conditions that affect steel production costs." />
                 </label>
-                <input
-                  type="number"
-                  value={formData.mwCapacity}
-                  onChange={(e) => updateFormData('mwCapacity', parseFloat(e.target.value) || 0)}
+                <select
+                  value={formData.country}
+                  onChange={(e) => updateFormData('country', e.target.value)}
                   className="w-full border border-gray-300 rounded px-3 py-2"
-                />
+                >
+                  <option value="US">US</option>
+                  <option value="China">China</option>
+                  <option value="India">India</option>
+                    <option value="Other">Other</option>
+                </select>  
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Future Construction Year
+                  <Tooltip text="The year when construction is planned. The forecasting model uses SARIMAX to predict scrap prices up to this year based on historical data." />
                 </label>
                 <input
                   type="number"
@@ -142,25 +180,25 @@ export default function ForecastPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Country
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Steel Route
+                  <Tooltip text="Production method to forecast: BF-BOF (traditional blast furnace, higher emissions) or Scrap-EAF (electric arc furnace using scrap, lower emissions). Determines which cost structure to use." />
                 </label>
                 <select
-                  value={formData.country}
-                  onChange={(e) => updateFormData('country', e.target.value)}
+                  value={formData.steelRoute}
+                  onChange={(e) => updateFormData('steelRoute', e.target.value as SteelProductionRoute)}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
-                  <option value="US">US</option>
-                  <option value="China">China</option>
-                  <option value="India">India</option>
-                  <option value="Germany">Germany</option>
-                  <option value="Brazil">Brazil</option>
+                  {Object.keys(STEEL_ROUTES).map(route => (
+                    <option key={route} value={route}>{route}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Carbon Tax ($/ton CO₂)
+                  <Tooltip text="The cost per ton of CO₂ emissions. Applied to production emissions to calculate total cost. Higher carbon taxes make low-emission routes (EAF) more competitive." />
                 </label>
                 <input
                   type="number"
@@ -175,7 +213,10 @@ export default function ForecastPage() {
               <h3 className="text-lg font-semibold mb-4">BF-BOF Assumptions</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Iron Ore ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Iron Ore ($/ton)
+                    <Tooltip text="Price per ton of iron ore, a primary raw material for BF-BOF steel production. Used in cost calculations for traditional steel production." />
+                  </label>
                   <input
                     type="number"
                     value={formData.bfAssumptions.iron_ore}
@@ -184,7 +225,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Coking Coal ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Coking Coal ($/ton)
+                    <Tooltip text="Price per ton of coking coal used in blast furnace operations. Essential fuel and reducing agent for BF-BOF steel production." />
+                  </label>
                   <input
                     type="number"
                     value={formData.bfAssumptions.coking_coal}
@@ -193,7 +237,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">BF Fluxes ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    BF Fluxes ($/ton)
+                    <Tooltip text="Price per ton of fluxing materials (limestone, dolomite) used in blast furnace operations to remove impurities during steel production." />
+                  </label>
                   <input
                     type="number"
                     value={formData.bfAssumptions.bf_fluxes}
@@ -202,7 +249,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Scrap ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Scrap ($/ton)
+                    <Tooltip text="Current price per ton of scrap metal. Used as a baseline to convert forecasted scrap index values to dollar amounts. Also used as coolant in BF-BOF." />
+                  </label>
                   <input
                     type="number"
                     value={formData.bfAssumptions.scrap}
@@ -211,7 +261,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Other Costs BF ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Other Costs BF ($/ton)
+                    <Tooltip text="Additional costs per ton for BF-BOF production including labor, maintenance, overhead, and other operational expenses not covered by raw materials." />
+                  </label>
                   <input
                     type="number"
                     value={formData.bfAssumptions.other_costs_bf}
@@ -226,7 +279,10 @@ export default function ForecastPage() {
               <h3 className="text-lg font-semibold mb-4">EAF Assumptions</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Electricity ($/kWh)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Electricity ($/kWh)
+                    <Tooltip text="Price per kilowatt-hour of electricity. EAF production is electricity-intensive, so this significantly impacts EAF costs. Grid carbon intensity affects emissions." />
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -236,7 +292,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Electrode ($/kg)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Electrode ($/kg)
+                    <Tooltip text="Price per kilogram of graphite electrodes used in electric arc furnaces. Electrodes conduct electricity and are consumed during EAF operations." />
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -246,7 +305,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">EAF Fluxes ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    EAF Fluxes ($/ton)
+                    <Tooltip text="Price per ton of fluxing materials used in EAF operations to remove impurities and control slag chemistry during steel production." />
+                  </label>
                   <input
                     type="number"
                     value={formData.eafAssumptions.eaf_fluxes}
@@ -255,7 +317,10 @@ export default function ForecastPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Other Costs EAF ($/ton)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Other Costs EAF ($/ton)
+                    <Tooltip text="Additional costs per ton for EAF production including labor, maintenance, overhead, and other operational expenses not covered by raw materials and electricity." />
+                  </label>
                   <input
                     type="number"
                     value={formData.eafAssumptions.other_costs_eaf}
