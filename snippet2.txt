@@ -1,0 +1,60 @@
+                    dataKey={name}
+                    stroke={colors[index % colors.length]}
+                    fill={colors[index % colors.length]}
+                    fillOpacity={0.3}
+                  />
+                );
+              })}
+              <Tooltip />
+              <Legend />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Detailed Results Table */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h3 className="text-xl font-semibold mb-4">Detailed Results</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Cost</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Production CO₂</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transport CO₂</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total CO₂</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk Score</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Final Score</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {results.map((result) => (
+                  <tr key={result.supplier.id}>
+                    <td className="px-4 py-3 whitespace-nowrap font-medium">
+                      {result.supplier.name || `Supplier (${result.supplier.country})`}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      ${result.totalLandedCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{result.productionCO2.toFixed(2)} t</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{result.transportCO2.toFixed(3)} t</td>
+                    <td className="px-4 py-3 whitespace-nowrap font-semibold">{result.totalCarbon.toFixed(2)} t</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{(result.supplierRiskScore * 100).toFixed(1)}%</td>
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-blue-600">
+                      {(result.finalScore * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex justify-between">
+          <button
+            onClick={() => router.push('/weights')}
+            className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition text-lg font-semibold"
+          >
+            ← Back to Weights
+          </button>
+          <button

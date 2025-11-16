@@ -73,7 +73,7 @@ export default function WeightsPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Steel Procurement Decision Tool</h1>
-        <p className="text-gray-600 mb-8">Page 3: Weight Configuration</p>
+        <p className="text-gray-600 mb-8">Page 2: Weight Configuration</p>
 
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 className="text-2xl font-semibold mb-6">Set Decision Criteria Weights</h2>
@@ -172,10 +172,10 @@ export default function WeightsPage() {
 
         <div className="flex justify-between">
           <button
-            onClick={() => router.push('/transportation')}
+            onClick={() => router.push('/')}
             className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition text-lg font-semibold"
           >
-            ← Back to Transportation
+            ← Back to Suppliers
           </button>
           <button
             onClick={saveAndContinue}

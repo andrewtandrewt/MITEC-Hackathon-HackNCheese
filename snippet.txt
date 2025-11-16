@@ -1,0 +1,40 @@
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 bg-white'
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-2xl font-bold text-gray-400">#{index + 1}</span>
+                      <h3 className="text-xl font-semibold">
+                        {result.supplier.name || `Supplier (${result.supplier.country})`}
+                      </h3>
+                      {index === 0 && (
+                        <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                          RECOMMENDED
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                      <div>
+                        <p className="text-sm text-gray-600">Final Score</p>
+                        <p className="text-lg font-bold text-blue-600">
+                          {(result.finalScore * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Cost</p>
+                        <p className="text-lg font-bold">
+                          ${result.totalLandedCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Carbon</p>
+                        <p className="text-lg font-bold text-green-600">
+                          {result.totalCarbon.toFixed(2)} t CO₂
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Risk Score</p>
+                        <p className="text-lg font-bold text-red-600">
+                          {(result.supplierRiskScore * 100).toFixed(1)}%

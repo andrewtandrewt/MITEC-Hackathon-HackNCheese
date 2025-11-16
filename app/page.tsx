@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Supplier } from '@/types';
-import { MOCK_SUPPLIERS } from '@/data/mockSuppliers';
-import { STEEL_ROUTES, COUNTRY_FACTORS } from '@/data/constants';
+import { Supplier, TransportationSegment, Country } from '@/types';
+import { MOCK_SUPPLIERS, getDefaultTransportation } from '@/data/mockSuppliers';
+import { STEEL_ROUTES, COUNTRY_FACTORS, TRANSPORT_MODES } from '@/data/constants';
+import { calculateSteelRequirement } from '@/utils/steel';
 import { getDefaultTradePolicyValues } from '@/data/tradePolicy';
 import Tooltip from '@/components/Tooltip';
 
@@ -13,6 +14,7 @@ export default function Home() {
   const [suppliers, setSuppliers] = useState<Supplier[]>(MOCK_SUPPLIERS);
   const [hasForecast, setHasForecast] = useState(false);
   const [solarFarmCapacity, setSolarFarmCapacity] = useState<number>(100.0);
+  const steelRequirement = calculateSteelRequirement(solarFarmCapacity);
 
   useEffect(() => {
     // Check if forecasted prices are available
@@ -60,14 +62,15 @@ export default function Home() {
       tariffRate: tradePolicy.tariffRate,
       antiDumpingDuty: tradePolicy.antiDumpingDuty,
       countervailingDuty: tradePolicy.countervailingDuty,
-      domesticTaxCredits: tradePolicy.domesticTaxCredits,
-      greenSteelSubsidies: tradePolicy.greenSteelSubsidies,
-      supplierReliability: 5,
-      leadTime: 30,
-      supplyChainHandoffs: 1,
-      minOrderCommitment: 0,
-      brokerageFees: 0,
-    };
+    domesticTaxCredits: tradePolicy.domesticTaxCredits,
+    greenSteelSubsidies: tradePolicy.greenSteelSubsidies,
+    supplierReliability: 5,
+    leadTime: 30,
+    supplyChainHandoffs: 1,
+    minOrderCommitment: 0,
+    brokerageFees: 0,
+    transportation: getDefaultTransportation(country),
+  };
     setSuppliers([...suppliers, newSupplier]);
   };
 
@@ -93,15 +96,66 @@ export default function Home() {
         updated.domesticTaxCredits = tradePolicy.domesticTaxCredits;
         updated.greenSteelSubsidies = tradePolicy.greenSteelSubsidies;
       }
+
+      if (field === 'country') {
+        updated.transportation = getDefaultTransportation(value as Country);
+      }
       
       return updated;
     }));
   };
 
+  const updateTransportation = (
+    id: string,
+    updater: (segments: TransportationSegment[]) => TransportationSegment[]
+  ) => {
+    setSuppliers(current =>
+      current.map(supplier => {
+        if (supplier.id !== id) return supplier;
+        const currentSegments = supplier.transportation?.segments ?? [];
+        return {
+          ...supplier,
+          transportation: {
+            segments: updater(currentSegments),
+          },
+        };
+      })
+    );
+  };
+
+  const addTransportationSegment = (id: string) => {
+    updateTransportation(id, segments => [
+      ...segments,
+      { distance: 0, mode: 'Truck' },
+    ]);
+  };
+
+  const removeTransportationSegment = (id: string, index: number) => {
+    updateTransportation(id, segments => {
+      if (segments.length <= 1) {
+        return segments;
+      }
+      return segments.filter((_, i) => i !== index);
+    });
+  };
+
+  const updateTransportationSegment = (
+    id: string,
+    index: number,
+    field: keyof TransportationSegment,
+    value: any
+  ) => {
+    updateTransportation(id, segments =>
+      segments.map((segment, i) =>
+        i === index ? { ...segment, [field]: value } : segment
+      )
+    );
+  };
+
   const saveAndContinue = () => {
     localStorage.setItem('suppliers', JSON.stringify(suppliers));
     localStorage.setItem('solarFarmCapacity', JSON.stringify(solarFarmCapacity));
-    router.push('/transportation');
+    router.push('/weights');
   };
 
   return (
@@ -133,7 +187,7 @@ export default function Home() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Solar Farm Capacity (MW)
-                <Tooltip text="The total capacity of the solar farm project in megawatts. Used to calculate total steel tonnage required (approximately 40 tons per MW)." />
+                <Tooltip text="Project size in megawatts. Used to estimate the number of tracker rows and total steel tonnage (row weight = 884.46 kg)." />
               </label>
               <input
                 type="number"
@@ -143,6 +197,35 @@ export default function Home() {
                 min="0"
               />
             </div>
+          </div>
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Steel Requirement Estimate</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600 mb-1">Tracker Rows Needed</p>
+                <p className="text-2xl font-bold text-blue-700">
+                  {steelRequirement.totalRows.toLocaleString('en-US')}
+                </p>
+                <p className="text-xs text-gray-500">Rounded up to whole rows</p>
+              </div>
+              <div>
+                <p className="text-gray-600 mb-1">Steel Tonnage</p>
+                <p className="text-2xl font-bold text-green-700">
+                  {steelRequirement.totalSteelTonnes.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t
+                </p>
+                <p className="text-xs text-gray-500">Total tonnes required</p>
+              </div>
+              <div>
+                <p className="text-gray-600 mb-1">Steel Weight (kg)</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {steelRequirement.totalSteelKg.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
+                </p>
+                <p className="text-xs text-gray-500">Row weight: 884.46 kg</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              Assumes 615 W panels, 90 panels per row, and 884.46 kg of steel per tracker row.
+            </p>
           </div>
         </div>
 
@@ -166,19 +249,34 @@ export default function Home() {
           </div>
 
           <div className="space-y-6">
-            {suppliers.map((supplier, index) => (
-              <div key={supplier.id} className="border-2 border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold">Supplier {index + 1}</h3>
-                  <button
-                    onClick={() => removeSupplier(supplier.id)}
-                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                  >
-                    Remove
-                  </button>
-                </div>
+            {suppliers.map((supplier, index) => {
+              const segments =
+                supplier.transportation?.segments && supplier.transportation.segments.length > 0
+                  ? supplier.transportation.segments
+                  : [{ distance: 0, mode: 'Truck' }];
+              const transportTotals = segments.reduce(
+                (totals, segment) => {
+                  const config = TRANSPORT_MODES[segment.mode];
+                  totals.cost += config.costPerTonKm * segment.distance * 1000;
+                  totals.co2 += (config.co2PerTonKm * segment.distance * 1000) / 1000000;
+                  return totals;
+                },
+                { cost: 0, co2: 0 }
+              );
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              return (
+                <div key={supplier.id} className="border-2 border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold">Supplier {index + 1}</h3>
+                    <button
+                      onClick={() => removeSupplier(supplier.id)}
+                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Name
@@ -382,19 +480,140 @@ export default function Home() {
                       className="w-full border border-gray-300 rounded px-3 py-2"
                     />
                   </div>
-                </div>
-
-                {supplier.country && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded">
-                    <p className="text-sm text-gray-600">
-                      <strong>Country Factors:</strong> Cost Score: {COUNTRY_FACTORS[supplier.country].costScore.toFixed(2)}, 
-                      Risk Score: {COUNTRY_FACTORS[supplier.country].riskScore.toFixed(2)}, 
-                      Trade Score: {COUNTRY_FACTORS[supplier.country].tradeScore.toFixed(2)}
-                    </p>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {supplier.country && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded">
+                      <p className="text-sm text-gray-600">
+                        <strong>Country Factors:</strong> Cost Score: {COUNTRY_FACTORS[supplier.country].costScore.toFixed(2)}, 
+                        Risk Score: {COUNTRY_FACTORS[supplier.country].riskScore.toFixed(2)}, 
+                        Trade Score: {COUNTRY_FACTORS[supplier.country].tradeScore.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mt-6 border-t border-gray-200 pt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-lg font-semibold">Transportation Plan</h4>
+                        <p className="text-sm text-gray-500">
+                          Configure the route for this supplier. Add multiple segments for multi-modal transport.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => addTransportationSegment(supplier.id)}
+                        className="bg-blue-50 text-blue-700 px-3 py-1 rounded hover:bg-blue-100 transition text-sm font-semibold"
+                      >
+                        + Add Segment
+                      </button>
+                    </div>
+
+                    <div className="mt-4 space-y-4">
+                      {segments.map((segment, segmentIndex) => {
+                        const config = TRANSPORT_MODES[segment.mode];
+                        const segmentCost = config.costPerTonKm * segment.distance * 1000;
+                        const segmentCO2 = (config.co2PerTonKm * segment.distance * 1000) / 1000000;
+
+                        return (
+                          <div key={segmentIndex} className="border border-gray-200 rounded-lg p-4">
+                            <div className="flex justify-between items-center mb-3">
+                              <h5 className="font-semibold text-gray-900">Segment {segmentIndex + 1}</h5>
+                              {segments.length > 1 && (
+                                <button
+                                  onClick={() => removeTransportationSegment(supplier.id, segmentIndex)}
+                                  className="text-sm text-red-600 hover:text-red-700"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Distance (km)
+                                  <Tooltip text="Enter the distance covered by this segment in kilometers. Create separate segments for each mode change (e.g., ship + truck)." />
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={segment.distance}
+                                  onChange={(e) =>
+                                    updateTransportationSegment(
+                                      supplier.id,
+                                      segmentIndex,
+                                      'distance',
+                                      parseFloat(e.target.value) || 0
+                                    )
+                                  }
+                                  className="w-full border border-gray-300 rounded px-3 py-2"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Transport Mode
+                                  <Tooltip text="Select the transport method for this leg. Each mode has a different freight cost and carbon intensity." />
+                                </label>
+                                <select
+                                  value={segment.mode}
+                                  onChange={(e) =>
+                                    updateTransportationSegment(
+                                      supplier.id,
+                                      segmentIndex,
+                                      'mode',
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full border border-gray-300 rounded px-3 py-2"
+                                >
+                                  {Object.values(TRANSPORT_MODES).map(mode => (
+                                    <option key={mode.mode} value={mode.mode}>
+                                      {mode.mode} ({mode.co2PerTonKm} g CO₂/ton-km)
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {segment.distance > 0 && (
+                              <div className="mt-4 grid grid-cols-2 gap-4 text-sm bg-gray-50 rounded p-3">
+                                <div>
+                                  <span className="text-gray-600">Segment Cost:</span>
+                                  <span className="font-semibold ml-2">
+                                    ${segmentCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Segment CO₂:</span>
+                                  <span className="font-semibold ml-2">
+                                    {segmentCO2.toFixed(3)} t CO₂
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 bg-blue-50 rounded-lg p-4">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Total Freight Cost (1,000 tons)</p>
+                        <p className="text-2xl font-bold text-blue-700">
+                          ${transportTotals.cost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">Total Transport CO₂ (1,000 tons)</p>
+                        <p className="text-2xl font-bold text-green-700">
+                          {transportTotals.co2.toFixed(3)} t CO₂
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -403,7 +622,7 @@ export default function Home() {
             onClick={saveAndContinue}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition text-lg font-semibold"
           >
-            Continue to Transportation →
+            Continue to Weights →
           </button>
         </div>
       </div>
