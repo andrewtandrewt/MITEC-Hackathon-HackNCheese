@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Supplier, Transportation, CalculationWeights, SupplierResult } from '@/types';
 import { calculateFinalScores } from '@/utils/calculations';
+import { calculateSteelRequirement, SteelRequirement } from '@/utils/steel';
+import { getDefaultTransportation } from '@/data/mockSuppliers';
 import {
   BarChart,
   Bar,
@@ -25,29 +27,73 @@ export default function ResultsPage() {
   const router = useRouter();
   const [results, setResults] = useState<SupplierResult[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [transportation, setTransportation] = useState<Transportation | null>(null);
   const [weights, setWeights] = useState<CalculationWeights | null>(null);
+  const [steelRequirement, setSteelRequirement] = useState<SteelRequirement | null>(null);
+  const [solarCapacity, setSolarCapacity] = useState<number | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     const suppliersData = localStorage.getItem('suppliers');
     const transportationData = localStorage.getItem('transportation');
     const weightsData = localStorage.getItem('weights');
+    const capacityData = localStorage.getItem('solarFarmCapacity');
 
-    if (suppliersData && transportationData && weightsData) {
-      const s: Supplier[] = JSON.parse(suppliersData);
-      const t: Transportation = JSON.parse(transportationData);
-      const w: CalculationWeights = JSON.parse(weightsData);
+    if (suppliersData && weightsData) {
+      try {
+        const fallback: Transportation | null = transportationData ? JSON.parse(transportationData) : null;
+        const parsedSuppliers: Supplier[] = JSON.parse(suppliersData).map(supplier => {
+          if (supplier.transportation?.segments?.length) {
+            return supplier;
+          }
+          if (fallback?.segments?.length) {
+            return {
+              ...supplier,
+              transportation: {
+                segments: fallback.segments.map(segment => ({ ...segment })),
+              },
+            };
+          }
+          return {
+            ...supplier,
+            transportation: getDefaultTransportation(supplier.country),
+          };
+        });
+        const parsedWeights: CalculationWeights = JSON.parse(weightsData);
 
-      setSuppliers(s);
-      setTransportation(t);
-      setWeights(w);
+        const parsedCapacity = capacityData ? JSON.parse(capacityData) : 0;
+        const safeCapacity = Number.isFinite(parsedCapacity) ? parsedCapacity : 0;
+        const requirement = calculateSteelRequirement(safeCapacity);
 
-      const calculatedResults = calculateFinalScores(s, t, w, 1000);
-      setResults(calculatedResults);
+        setSuppliers(parsedSuppliers);
+        setWeights(parsedWeights);
+        setSolarCapacity(safeCapacity);
+        setSteelRequirement(requirement);
+
+        const calculatedResults = calculateFinalScores(
+          parsedSuppliers,
+          parsedWeights,
+          Math.max(requirement.totalSteelTonnes, 0),
+          fallback ?? undefined
+        );
+        setResults(calculatedResults);
+      } catch {
+        setSuppliers([]);
+        setWeights(null);
+        setResults([]);
+      }
     }
+    setIsLoaded(true);
   }, []);
 
-  if (!transportation || !weights || results.length === 0) {
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8 flex items-center justify-center">
+        <p className="text-xl text-gray-600">Preparing results...</p>
+      </div>
+    );
+  }
+
+  if (!weights || suppliers.length === 0 || results.length === 0 || !steelRequirement) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8 flex items-center justify-center">
         <div className="text-center">
@@ -111,7 +157,37 @@ export default function ResultsPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Steel Procurement Decision Tool</h1>
-        <p className="text-gray-600 mb-8">Page 4: Results Dashboard</p>
+        <p className="text-gray-600 mb-8">Page 3: Results Dashboard</p>
+
+        {steelRequirement && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-2xl font-semibold mb-4">Project Demand Summary</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-600 mb-1">Solar Capacity</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {(solarCapacity ?? 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} MW
+                </p>
+              </div>
+              <div>
+                <p className="text-gray-600 mb-1">Tracker Rows</p>
+                <p className="text-3xl font-bold text-blue-700">
+                  {steelRequirement.totalRows.toLocaleString('en-US')}
+                </p>
+                <p className="text-xs text-gray-500">Rounded up</p>
+              </div>
+              <div>
+                <p className="text-gray-600 mb-1">Steel Demand</p>
+                <p className="text-3xl font-bold text-green-700">
+                  {steelRequirement.totalSteelTonnes.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} t
+                </p>
+                <p className="text-xs text-gray-500">
+                  {steelRequirement.totalSteelKg.toLocaleString('en-US')} kg total
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Rankings */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -133,6 +209,9 @@ export default function ResultsPage() {
                       <h3 className="text-xl font-semibold">
                         {result.supplier.name || `Supplier (${result.supplier.country})`}
                       </h3>
+                      <span className="text-sm text-gray-500">
+                        {result.supplier.steelRoute === 'Scrap-EAF' ? 'Scrap-EAF (EAF)' : 'BF-BOF'}
+                      </span>
                       {index === 0 && (
                         <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
                           RECOMMENDED
@@ -243,6 +322,7 @@ export default function ResultsPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Cost</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Production CO₂</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transport CO₂</th>
@@ -256,6 +336,9 @@ export default function ResultsPage() {
                   <tr key={result.supplier.id}>
                     <td className="px-4 py-3 whitespace-nowrap font-medium">
                       {result.supplier.name || `Supplier (${result.supplier.country})`}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {result.supplier.steelRoute === 'Scrap-EAF' ? 'Scrap-EAF (EAF)' : 'BF-BOF'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       ${result.totalLandedCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}

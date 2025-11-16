@@ -9,17 +9,31 @@ import {
 } from '@/types';
 import { STEEL_ROUTES, TRANSPORT_MODES, COUNTRY_FACTORS } from '@/data/constants';
 
+function getSegmentsForSupplier(
+  supplier: Supplier,
+  fallbackTransportation?: Transportation
+) {
+  if (supplier.transportation?.segments?.length) {
+    return supplier.transportation.segments;
+  }
+  if (fallbackTransportation?.segments?.length) {
+    return fallbackTransportation.segments;
+  }
+  return [];
+}
+
 /**
  * Calculate total landed cost for a supplier
  */
 export function calculateTotalLandedCost(
   supplier: Supplier,
-  transportation: Transportation,
-  quantity: number = 1000 // default 1000 tons
+  quantity: number = 1000,
+  fallbackTransportation?: Transportation
 ): { totalCost: number; freightCost: number } {
   // Calculate freight cost for all transportation segments
   let freightCost = 0;
-  for (const segment of transportation.segments) {
+  const segments = getSegmentsForSupplier(supplier, fallbackTransportation);
+  for (const segment of segments) {
     const transportConfig = TRANSPORT_MODES[segment.mode];
     freightCost += transportConfig.costPerTonKm * segment.distance * quantity;
   }
@@ -49,15 +63,16 @@ export function calculateTotalLandedCost(
  */
 export function calculateTotalCarbon(
   supplier: Supplier,
-  transportation: Transportation,
-  quantity: number = 1000 // default 1000 tons
+  quantity: number = 1000,
+  fallbackTransportation?: Transportation
 ): { totalCO2: number; productionCO2: number; transportCO2: number } {
   const steelRoute = STEEL_ROUTES[supplier.steelRoute];
   const productionCO2 = steelRoute.co2Average * quantity; // t CO2
 
   // Calculate transport CO2 for all transportation segments
   let transportCO2 = 0;
-  for (const segment of transportation.segments) {
+  const segments = getSegmentsForSupplier(supplier, fallbackTransportation);
+  for (const segment of segments) {
     const transportConfig = TRANSPORT_MODES[segment.mode];
     // Convert g CO2 to t CO2: divide by 1,000,000
     transportCO2 += (transportConfig.co2PerTonKm * segment.distance * quantity) / 1000000; // t CO2
@@ -146,14 +161,22 @@ function normalizeCarbon(carbon: number, allCarbons: number[]): number {
  */
 export function calculateFinalScores(
   suppliers: Supplier[],
-  transportation: Transportation,
   weights: CalculationWeights,
-  quantity: number = 1000
+  quantity: number = 1000,
+  fallbackTransportation?: Transportation
 ): SupplierResult[] {
   // Calculate all intermediate values
   const intermediateResults = suppliers.map(supplier => {
-    const { totalCost, freightCost } = calculateTotalLandedCost(supplier, transportation, quantity);
-    const { totalCO2, productionCO2, transportCO2 } = calculateTotalCarbon(supplier, transportation, quantity);
+    const { totalCost, freightCost } = calculateTotalLandedCost(
+      supplier,
+      quantity,
+      fallbackTransportation
+    );
+    const { totalCO2, productionCO2, transportCO2 } = calculateTotalCarbon(
+      supplier,
+      quantity,
+      fallbackTransportation
+    );
     const supplierRiskScore = calculateSupplierRiskScore(supplier);
     const countryScore = calculateCountryScore(supplier);
 
